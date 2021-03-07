@@ -1,11 +1,13 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using WebApp.Models;
 
 namespace WebApp.Controllers
 {
+    [ApiController]
     [Route("api/[controller]")]
     public class ProductsController : ControllerBase
     {
@@ -19,40 +21,54 @@ namespace WebApp.Controllers
 
         // GET
         [HttpGet]
-        public IEnumerable<Product> GetProducts()
+        public IAsyncEnumerable<Product> GetProducts()
         {
             //Requesting all the Product objects from the database
             return context.Products;
         }
 
-        //Dependencies declared by action methods must be decorated with [FromService]
         [HttpGet("{id}")]
-        public Product GetProduct(long id, [FromServices] ILogger<ProductsController> logger)
+        public async Task<IActionResult> GetProduct(long id)
         {
-            //Declaring a dependency on ILoger<T>
-            logger.LogDebug("GetProduct Action Invoked");
-            return context.Products.Find(id);
+            Product p = await context.Products.FindAsync(id);
+            if (p == null)
+            {
+                return NotFound();
+            }
+
+            return Ok(new
+            {
+                ProductId = p.ProductId, Name = p.Name, Price = p.Price, CategoryId = p.CategoryId, SupplierId = p.SupplierId
+            });
         }
 
         [HttpPost]
-        public void SaveProduct([FromBody] Product product)
+        public async Task<IActionResult> SaveProduct(ProductBindingTarget target)
         {
-            context.Products.Add(product);
-            context.SaveChanges();
+            Product p = target.ToProduct();
+            await context.Products.AddAsync(p);
+            await context.SaveChangesAsync();
+            return Ok(p);
         }
 
         [HttpPut]
-        public void UpdateProduct([FromBody] Product product)
+        public async Task UpdateProduct(Product product)
         {
             context.Products.Update(product);
-            context.SaveChanges();
+            await context.SaveChangesAsync();
         }
 
         [HttpDelete("{id}")]
-        public void DeleteProduct(long id)
+        public async Task DeleteProduct(long id)
         {
-            context.Products.Remove(new Product(){ProductId = id});
-            context.SaveChanges();
+            context.Products.Remove(new Product() { ProductId = id });
+            await context.SaveChangesAsync();
+        }
+
+        [HttpGet("redirect")]
+        public IActionResult Redirect()
+        {
+            return RedirectToAction(nameof(GetProduct), new { Id = 1 });
         }
     }
 }
